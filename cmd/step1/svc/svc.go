@@ -2,16 +2,13 @@ package svc
 
 import (
 	"context"
-	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 	"os"
 	"path"
 	"test-model/pkg/amqp"
-	"test-model/pkg/helpers"
-	"test-model/pkg/proto/event"
+	"test-model/pkg/processors"
 	"time"
 )
 
@@ -49,7 +46,7 @@ func (t *svc) Run(ctx context.Context) error {
 			if err := t.process(ctx, msg); err != nil {
 				return errors.Wrap(err, "t.process")
 			}
-			if t.counter == t.config.XmlCount+t.config.JSONCount {
+			if t.counter == t.config.Total {
 				return nil
 			}
 		case err := <-errChan:
@@ -59,32 +56,14 @@ func (t *svc) Run(ctx context.Context) error {
 }
 
 func (t *svc) process(ctx context.Context, msg []byte) error {
-	v := event.RawEvent{}
-	if err := proto.Unmarshal(msg, &v); err != nil {
-		return errors.Wrap(err, "proto.Unmarshal")
-	}
-
-	e := &event.Event{}
-	switch v.Format {
-	case event.Format_XML:
-		if err := xml.Unmarshal(v.Data, e); err != nil {
-			return errors.Wrap(err, "xml.Unmarshal")
-		}
-	case event.Format_JSON:
-		if err := json.Unmarshal(v.Data, e); err != nil {
-			return errors.Wrap(err, "json.Unmarshal")
-		}
+	s1, err := processors.Step1(msg)
+	if err != nil {
+		return errors.Wrap(err, "processors.Step1")
 	}
 
 	t.counter++
 
-	s1 := event.EventStep1{
-		Event:     e,
-		Timestamp: time.Now().Unix(),
-		Meta1:     helpers.GenerateString(50),
-	}
-
-	raw, err := proto.Marshal(&s1)
+	raw, err := proto.Marshal(s1)
 	if err != nil {
 		return errors.Wrap(err, "proto.Marshal")
 	}

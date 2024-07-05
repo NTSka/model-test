@@ -1,7 +1,10 @@
 amqp:
   dsn: "amqp://user:password@localhost:5672/"
 
+clickhouse:
+  dsn: "clickhouse://user:password@localhost:9000/db"
+
 svc:
-  json_count: 100000
-  xml_count: 100000
-  report_dir: '/home/user/dir'
+  total: 50
+  eps: 10
+  report_dir: '/home/user/projects/test-model/reports2'

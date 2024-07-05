@@ -5,6 +5,6 @@ clickhouse:
   dsn: "clickhouse://user:password@clickhouse:9000/db"
 
 svc:
-  json_count: 30000
-  xml_count: 30000
+  total: 1000000
+  eps: 1000000
   report_dir: '/reports'

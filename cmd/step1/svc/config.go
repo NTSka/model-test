@@ -3,15 +3,13 @@ package svc
 import "github.com/spf13/viper"
 
 type Config struct {
-	XmlCount  int
-	JSONCount int
+	Total     int
 	ReportDir string
 }
 
 func NewConfig(v *viper.Viper) *Config {
 	return &Config{
-		XmlCount:  v.GetInt("svc.xml_count"),
-		JSONCount: v.GetInt("svc.json_count"),
+		Total:     v.GetInt("svc.total"),
 		ReportDir: v.GetString("svc.report_dir"),
 	}
 }

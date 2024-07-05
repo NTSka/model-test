@@ -28,7 +28,7 @@ func (t *svc) Insert(ctx context.Context, data []*event.EventStep3) error {
 
 		for _, e := range data {
 			_, err = stmt.ExecContext(
-				ctx, time.Unix(e.Event.Event.Timestamp, 0),
+				ctx, time.UnixMilli(e.Event.Event.Timestamp),
 				e.Event.Event.Event.Assets,
 				e.Event.Event.Event.EventSrc.Host,
 				e.Event.Event.Event.EventSrc.Type,

@@ -2,15 +2,12 @@ package svc
 
 import (
 	"context"
-	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/proto"
 	"os"
 	"path"
 	"test-model/pkg/amqp"
-	"test-model/pkg/helpers"
+	"test-model/pkg/processors"
 	"test-model/pkg/proto/event"
 	"test-model/pkg/storage"
 	"time"
@@ -55,7 +52,7 @@ func (t *svc) Close() error {
 
 func (t *svc) Run(ctx context.Context) error {
 	msgChan, errChan := t.consumer.Subscribe(ctx, amqp.QueueEnter)
-	rows := make([]*event.EventStep3, 0, t.config.XmlCount+t.config.JSONCount)
+	rows := make([]*event.EventStep3, 0, t.config.Total)
 
 	for {
 		select {
@@ -74,7 +71,7 @@ func (t *svc) Run(ctx context.Context) error {
 
 			rows = append(rows, e3)
 
-			if t.counter == t.config.XmlCount+t.config.JSONCount {
+			if t.counter == t.config.Total {
 				if err = t.Insert(ctx, rows); err != nil {
 					return errors.Wrap(err, "t.Insert")
 				}
@@ -87,48 +84,15 @@ func (t *svc) Run(ctx context.Context) error {
 }
 
 func (t *svc) processStep1(ctx context.Context, msg []byte) (*event.EventStep1, error) {
-	v := event.RawEvent{}
-	if err := proto.Unmarshal(msg, &v); err != nil {
-		return nil, errors.Wrap(err, "proto.Unmarshal")
-	}
-
-	e := &event.Event{}
-	switch v.Format {
-	case event.Format_XML:
-		if err := xml.Unmarshal(v.Data, e); err != nil {
-			return nil, errors.Wrap(err, "xml.Unmarshal")
-		}
-	case event.Format_JSON:
-		if err := json.Unmarshal(v.Data, e); err != nil {
-			return nil, errors.Wrap(err, "json.Unmarshal")
-		}
-	}
-
 	t.counter++
 
-	return &event.EventStep1{
-		Event:     e,
-		Timestamp: time.Now().Unix(),
-		Meta1:     helpers.GenerateString(50),
-	}, nil
+	return processors.Step1(msg)
 }
 
 func (t *svc) processStep2(ctx context.Context, v *event.EventStep1) *event.EventStep2 {
-	e := event.EventStep2{
-		Event: v,
-		Meta2: helpers.GenerateString(30),
-		Meta3: helpers.GenerateString(50),
-	}
-
-	return &e
+	return processors.Step2(v)
 }
 
 func (t *svc) processStep3(ctx context.Context, v *event.EventStep2) *event.EventStep3 {
-	e := event.EventStep3{
-		Event: v,
-		Meta4: helpers.GenerateString(30),
-		Meta5: helpers.GenerateString(50),
-	}
-
-	return &e
+	return processors.Step3(v)
 }

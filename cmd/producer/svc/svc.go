@@ -10,6 +10,7 @@ import (
 	"test-model/pkg/amqp"
 	"test-model/pkg/helpers"
 	"test-model/pkg/proto/event"
+	"time"
 )
 
 type Svc interface {
@@ -19,6 +20,7 @@ type Svc interface {
 type svc struct {
 	config   *Config
 	producer amqp.Producer
+	total    int
 }
 
 func NewSvc(config *Config, producer amqp.Producer) Svc {
@@ -31,46 +33,56 @@ func NewSvc(config *Config, producer amqp.Producer) Svc {
 var _ Svc = (*svc)(nil)
 
 func (t *svc) Run(ctx context.Context) error {
-	for i := 0; i < t.config.JSONCount; i++ {
-		raw, err := json.Marshal(t.makeEvent())
-		if err != nil {
-			return errors.Wrap(err, "json.Marshal")
-		}
+	ticker := time.NewTicker(time.Second)
 
-		rawEvent, err := proto.Marshal(&event.RawEvent{
-			Format: event.Format_JSON,
-			Data:   raw,
-		})
-		if err != nil {
-			return errors.Wrap(err, "json.Marshal")
-		}
+	for {
+		select {
+		case <-ticker.C:
+			for i := 0; i < t.config.EPS; i++ {
+				var rawEvent []byte
+				format := rand.Intn(2)
+				switch format {
+				case 0:
+					raw, err := json.Marshal(t.makeEvent())
+					if err != nil {
+						return errors.Wrap(err, "json.Marshal")
+					}
 
-		if err = t.producer.Publish(ctx, amqp.QueueEnter, rawEvent); err != nil {
-			return errors.Wrap(err, "amqp.Publish")
+					rawEvent, err = proto.Marshal(&event.RawEvent{
+						Format: event.Format_JSON,
+						Data:   raw,
+					})
+					if err != nil {
+						return errors.Wrap(err, "json.Marshal")
+					}
+				case 1:
+					raw, err := xml.Marshal(t.makeEvent())
+					if err != nil {
+						return errors.Wrap(err, "json.Marshal")
+					}
+
+					rawEvent, err = proto.Marshal(&event.RawEvent{
+						Format: event.Format_XML,
+						Data:   raw,
+					})
+					if err != nil {
+						return errors.Wrap(err, "xml.Marshal")
+					}
+
+				}
+
+				if err := t.producer.Publish(ctx, amqp.QueueEnter, rawEvent); err != nil {
+					return errors.Wrap(err, "amqp.Publish")
+				}
+
+				t.total++
+				if t.total >= t.config.Total {
+					ticker.Stop()
+					return nil
+				}
+			}
 		}
 	}
-
-	for i := 0; i < t.config.XmlCount; i++ {
-		e := t.makeEvent()
-		raw, err := xml.Marshal(e)
-		if err != nil {
-			return errors.Wrap(err, "xml.Marshal")
-		}
-
-		rawEvent, err := proto.Marshal(&event.RawEvent{
-			Format: event.Format_XML,
-			Data:   raw,
-		})
-		if err != nil {
-			return errors.Wrap(err, "xml.Marshal")
-		}
-
-		if err = t.producer.Publish(ctx, amqp.QueueEnter, rawEvent); err != nil {
-			return errors.Wrap(err, "producer.Publish")
-		}
-	}
-
-	return nil
 }
 
 func (t *svc) makeEvent() *event.Event {

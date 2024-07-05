@@ -39,7 +39,7 @@ var _ Service = (*svc)(nil)
 
 func (t *svc) Run(ctx context.Context) error {
 	msgChan, errChan := t.consumer.Subscribe(ctx, amqp.QueueStep3)
-	rows := make([]*event.EventStep3, 0, t.config.XmlCount+t.config.JSONCount)
+	rows := make([]*event.EventStep3, 0, t.config.Total)
 
 	for {
 		select {
@@ -52,7 +52,7 @@ func (t *svc) Run(ctx context.Context) error {
 				return errors.Wrap(err, "t.process")
 			}
 			rows = append(rows, v)
-			if t.counter == t.config.XmlCount+t.config.JSONCount {
+			if t.counter == t.config.Total {
 				if err = t.Insert(ctx, rows); err != nil {
 					return errors.Wrap(err, "t.Insert")
 				}
@@ -67,7 +67,7 @@ func (t *svc) Run(ctx context.Context) error {
 func (t *svc) Close() error {
 	text := fmt.Sprintf("total duration: %s; per event: %s;",
 		time.Now().Sub(t.startTime).String(),
-		time.Duration(t.sumTime/int64(t.counter)).String(),
+		(time.Millisecond * time.Duration(t.sumTime/int64(t.counter))).String(),
 	)
 
 	err := os.WriteFile(path.Join(t.config.ReportDir, "report4.txt"), []byte(text), 0666)
@@ -86,7 +86,7 @@ func (t *svc) process(ctx context.Context, msg []byte) (*event.EventStep3, error
 
 	t.counter++
 
-	t.sumTime += time.Now().Unix() - v.Event.Event.Timestamp
+	t.sumTime += time.Now().UnixMilli() - v.Event.Event.Timestamp
 
 	return &v, nil
 }

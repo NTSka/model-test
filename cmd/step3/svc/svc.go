@@ -8,7 +8,7 @@ import (
 	"os"
 	"path"
 	"test-model/pkg/amqp"
-	"test-model/pkg/helpers"
+	"test-model/pkg/processors"
 	"test-model/pkg/proto/event"
 	"time"
 )
@@ -47,7 +47,7 @@ func (t *svc) Run(ctx context.Context) error {
 			if err := t.process(ctx, msg); err != nil {
 				return errors.Wrap(err, "t.process")
 			}
-			if t.counter == t.config.XmlCount+t.config.JSONCount {
+			if t.counter == t.config.Total {
 				return nil
 			}
 		case err := <-errChan:
@@ -62,15 +62,11 @@ func (t *svc) process(ctx context.Context, msg []byte) error {
 		return errors.Wrap(err, "proto.Unmarshal")
 	}
 
-	e := event.EventStep3{
-		Event: &v,
-		Meta4: helpers.GenerateString(30),
-		Meta5: helpers.GenerateString(50),
-	}
+	e := processors.Step3(&v)
 
 	t.counter++
 
-	raw, err := proto.Marshal(&e)
+	raw, err := proto.Marshal(e)
 	if err != nil {
 		return errors.Wrap(err, "proto.Marshal")
 	}
