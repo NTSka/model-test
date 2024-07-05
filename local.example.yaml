@@ -1,0 +1,7 @@
+amqp:
+  dsn: "amqp://user:password@localhost:5672/"
+
+svc:
+  json_count: 100000
+  xml_count: 100000
+  report_dir: '/home/user/dir'

@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+option go_package="./event";
+
+enum Format {
+  XML = 0;
+  JSON = 1;
+}
+
+message RawEvent {
+  Format format = 1;
+  bytes data = 2;
+}
+
+enum Importance {
+  Info = 0;
+  Low = 1;
+  High = 2;
+  Medium = 3;
+}
+
+message EventSrc {
+  string host = 1;
+  string type = 2;
+}
+
+message Event {
+  repeated string assets = 1;
+  EventSrc event_src = 2;
+  string action = 3;
+  Importance importance = 4;
+  string Object = 5;
+}
+
+message EventStep1 {
+  Event event = 1;
+  int64 timestamp = 2;
+  string meta1 = 3;
+}
+
+message EventStep2 {
+  EventStep1 event = 1;
+  string meta2 = 2;
+  string meta3 = 3;
+}
+
+message EventStep3 {
+  EventStep2 event = 1;
+  string meta4 = 2;
+  string meta5 = 3;
+}

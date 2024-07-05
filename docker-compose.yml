@@ -1,0 +1,107 @@
+name: test-model
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server
+    environment:
+      CLICKHOUSE_USER: "user"
+      CLICKHOUSE_PASSWORD: "password"
+      CLICKHOUSE_DB: "db"
+    ports:
+      - 8123:8123
+      - 9000:9000
+
+  migrations:
+    build:
+      context: ./configs
+      dockerfile: ../docker/migrations.Dockerfile
+    environment:
+      DSN: "clickhouse://clickhouse:9000/?password=password&username=user&database=db"
+    links:
+      - clickhouse:clickhouse
+
+  rabbit:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: "user"
+      RABBITMQ_DEFAULT_PASS: "password"
+    ports:
+      - 5672:5672
+      - 15672:15672
+      - 4369:4369
+    volumes:
+      - ./configs/rabbit/10-defaults.conf:/etc/rabbitmq/conf.d/10-defaults.conf
+
+  generate_proto:
+    build:
+      context: .
+      dockerfile: docker/proto.Dockerfile
+    volumes:
+      - ./proto:/in
+      - ./pkg/proto:/out
+
+  producer:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        APP: producer
+    links:
+      - rabbit:rabbit
+
+  step1:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        APP: step1
+    links:
+      - rabbit:rabbit
+    volumes:
+      - "./reports:/reports"
+
+  step2:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        APP: step2
+    links:
+      - rabbit:rabbit
+    volumes:
+      - "./reports:/reports"
+
+  step3:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        APP: step3
+    links:
+      - rabbit:rabbit
+    volumes:
+      - "./reports:/reports"
+
+  step4:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        APP: step4
+    links:
+      - rabbit:rabbit
+      - clickhouse:clickhouse
+    volumes:
+      - "./reports:/reports"
+
+  mono:
+    build:
+      context: .
+      dockerfile: docker/go.Dockerfile
+      args:
+        APP: mono
+    links:
+      - rabbit:rabbit
+      - clickhouse:clickhouse
+    volumes:
+      - "./reports:/reports"

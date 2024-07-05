@@ -1,0 +1,10 @@
+amqp:
+  dsn: "amqp://user:password@localhost:5672/"
+
+clickhouse:
+  dsn: "clickhouse://user:password@localhost:9000/db"
+
+svc:
+  json_count: 1000
+  xml_count: 1000
+  report_dir: '/home/nts/projects/test-model/reports'
