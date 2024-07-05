@@ -4,7 +4,7 @@ import "crypto/sha256"
 
 func CPUBoundTask() {
 	st := ""
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 		st += GenerateString(10)
 	}
 
