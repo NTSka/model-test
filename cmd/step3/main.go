@@ -27,7 +27,7 @@ func main() {
 
 	log.Println("Config read")
 
-	producer, err := build.Producer(v)
+	producer, stopChan, err := build.Producer(v)
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "build.Producer"))
 	}
@@ -52,6 +52,8 @@ func main() {
 	if err = service.Close(); err != nil {
 		log.Fatal(err)
 	}
+
+	<-stopChan
 
 	log.Println("Stopping service")
 

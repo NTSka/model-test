@@ -12,6 +12,7 @@ import (
 
 func Step1(msg []byte) (*event.EventStep1, error) {
 	v := event.RawEvent{}
+	t := time.Now().UnixMilli()
 	if err := proto.Unmarshal(msg, &v); err != nil {
 		return nil, errors.Wrap(err, "proto.Unmarshal")
 	}
@@ -32,7 +33,7 @@ func Step1(msg []byte) (*event.EventStep1, error) {
 
 	return &event.EventStep1{
 		Event:     e,
-		Timestamp: time.Now().UnixMilli(),
+		Timestamp: t,
 		Meta1:     helpers.GenerateString(50),
 	}, nil
 }

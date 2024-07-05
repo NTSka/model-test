@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
+	"log"
 	"os"
 	"path"
+	"sync"
 	"test-model/pkg/amqp"
+	"test-model/pkg/helpers"
 	"test-model/pkg/processors"
 	"test-model/pkg/proto/event"
 	"time"
@@ -24,6 +27,11 @@ type svc struct {
 	producer  amqp.Producer
 	counter   int
 	startTime time.Time
+	pool      *helpers.WorkersPull
+	finished  chan struct{}
+	stop      chan struct{}
+	ch        chan []byte
+	*sync.Mutex
 }
 
 func NewSvc(config *Config, consumer amqp.Consumer, producer amqp.Producer) Service {
@@ -31,6 +39,11 @@ func NewSvc(config *Config, consumer amqp.Consumer, producer amqp.Producer) Serv
 		config:   config,
 		consumer: consumer,
 		producer: producer,
+		pool:     helpers.NewWorkersPull(config.Workers),
+		finished: make(chan struct{}),
+		stop:     make(chan struct{}),
+		ch:       make(chan []byte),
+		Mutex:    &sync.Mutex{},
 	}
 }
 
@@ -38,40 +51,59 @@ var _ Service = (*svc)(nil)
 
 func (t *svc) Run(ctx context.Context) error {
 	msgChan, errChan := t.consumer.Subscribe(ctx, amqp.QueueStep1)
+
+	err := t.producer.Publish(ctx, amqp.QueueStep2, t.ch, t.stop)
+	if err != nil {
+		return err
+	}
+
 	for {
 		select {
 		case msg := <-msgChan:
 			if t.counter == 0 {
 				t.startTime = time.Now()
 			}
-			if err := t.process(ctx, msg); err != nil {
-				return errors.Wrap(err, "t.process")
-			}
-			if t.counter == t.config.Total {
-				return nil
-			}
+			t.pool.Add(func() {
+				if err := t.process(ctx, msg); err != nil {
+					log.Println("process err:", err)
+				}
+			})
+		case <-t.finished:
+			return nil
 		case err := <-errChan:
 			return err
 		}
 	}
 }
 
-func (t *svc) process(ctx context.Context, msg []byte) error {
+func (t *svc) process(ctx context.Context, msg amqp.Message) error {
 	v := event.EventStep1{}
-	if err := proto.Unmarshal(msg, &v); err != nil {
+	if err := proto.Unmarshal(msg.Data(), &v); err != nil {
+		msg.Nack()
 		return errors.Wrap(err, "proto.Unmarshal")
 	}
 
 	e := processors.Step2(&v)
 
-	t.counter++
-
 	raw, err := proto.Marshal(e)
 	if err != nil {
+		msg.Nack()
 		return errors.Wrap(err, "proto.Marshal")
 	}
 
-	return errors.Wrap(t.producer.Publish(ctx, amqp.QueueStep2, raw), "amqp.Publish")
+	t.ch <- raw
+
+	msg.Ack()
+
+	t.Lock()
+	t.counter++
+	if t.counter == t.config.Total {
+		t.stop <- struct{}{}
+		t.finished <- struct{}{}
+	}
+	t.Unlock()
+
+	return nil
 }
 
 func (t *svc) Close() error {

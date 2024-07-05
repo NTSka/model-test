@@ -21,12 +21,16 @@ type svc struct {
 	config   *Config
 	producer amqp.Producer
 	total    int
+	stop     chan struct{}
+	ch       chan []byte
 }
 
 func NewSvc(config *Config, producer amqp.Producer) Svc {
 	return &svc{
 		config:   config,
 		producer: producer,
+		stop:     make(chan struct{}),
+		ch:       make(chan []byte),
 	}
 }
 
@@ -34,6 +38,10 @@ var _ Svc = (*svc)(nil)
 
 func (t *svc) Run(ctx context.Context) error {
 	ticker := time.NewTicker(time.Second)
+
+	if err := t.producer.Publish(ctx, amqp.QueueEnter, t.ch, t.stop); err != nil {
+		return errors.Wrap(err, "amqp.Publish")
+	}
 
 	for {
 		select {
@@ -68,16 +76,14 @@ func (t *svc) Run(ctx context.Context) error {
 					if err != nil {
 						return errors.Wrap(err, "xml.Marshal")
 					}
-
 				}
 
-				if err := t.producer.Publish(ctx, amqp.QueueEnter, rawEvent); err != nil {
-					return errors.Wrap(err, "amqp.Publish")
-				}
+				t.ch <- rawEvent
 
 				t.total++
 				if t.total >= t.config.Total {
 					ticker.Stop()
+					t.stop <- struct{}{}
 					return nil
 				}
 			}

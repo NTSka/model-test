@@ -9,21 +9,24 @@ import (
 type Producer interface {
 	Init() error
 	Close() error
-	Publish(ctx context.Context, queue Queue, data []byte) error
+	Publish(ctx context.Context, queue Queue, ch chan []byte, stop chan struct{}) error
 }
 
 type producer struct {
 	config  *Config
 	client  *amqp.Connection
 	channel *amqp.Channel
+	stop    chan struct{}
 }
 
 var _ Producer = (*producer)(nil)
 
-func NewProducer(cfg *Config) Producer {
+func NewProducer(cfg *Config) (Producer, chan struct{}) {
+	ch := make(chan struct{})
 	return &producer{
 		config: cfg,
-	}
+		stop:   ch,
+	}, ch
 }
 
 func (t *producer) Init() error {
@@ -48,7 +51,9 @@ func (t *producer) Close() error {
 	return errors.Wrap(t.client.Close(), "client.Close")
 }
 
-func (t *producer) Publish(ctx context.Context, queue Queue, data []byte) error {
+func (t *producer) Publish(ctx context.Context, queue Queue,
+	ch chan []byte,
+	stop chan struct{}) error {
 	q, err := t.channel.QueueDeclare(
 		queue.String(),
 		true,
@@ -61,16 +66,26 @@ func (t *producer) Publish(ctx context.Context, queue Queue, data []byte) error 
 		return errors.Wrap(err, "channel.QueueDeclare")
 	}
 
-	err = t.channel.PublishWithContext(
-		ctx,
-		"",
-		q.Name,
-		false,
-		false,
-		amqp.Publishing{
-			Body: data,
-		},
-	)
+	go func() {
+		for {
+			select {
+			case data := <-ch:
+				err = t.channel.PublishWithContext(
+					ctx,
+					"",
+					q.Name,
+					false,
+					false,
+					amqp.Publishing{
+						Body: data,
+					},
+				)
+			case <-stop:
+				t.stop <- struct{}{}
+				return
+			}
+		}
+	}()
 
-	return errors.Wrap(err, "amqp.PublishWithContext")
+	return nil
 }

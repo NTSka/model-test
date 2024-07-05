@@ -5,6 +5,7 @@ clickhouse:
   dsn: "clickhouse://user:password@localhost:9000/db"
 
 svc:
-  total: 50
-  eps: 10
+  total: 100000
+  eps: 100000
+  workers: 8
   report_dir: '/home/nts/projects/test-model/reports2'

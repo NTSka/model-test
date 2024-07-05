@@ -7,17 +7,17 @@ import (
 	"test-model/pkg/storage"
 )
 
-func Producer(v *viper.Viper) (amqp.Producer, error) {
+func Producer(v *viper.Viper) (amqp.Producer, chan struct{}, error) {
 	cfg := amqp.NewConfig(v)
 
-	producer := amqp.NewProducer(cfg)
+	producer, stop := amqp.NewProducer(cfg)
 
 	err := producer.Init()
 	if err != nil {
-		return nil, errors.Wrap(err, "producer.Init")
+		return nil, nil, errors.Wrap(err, "producer.Init")
 	}
 
-	return producer, err
+	return producer, stop, err
 }
 
 func Consumer(v *viper.Viper) (amqp.Consumer, error) {
