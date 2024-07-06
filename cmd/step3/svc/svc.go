@@ -25,6 +25,7 @@ type svc struct {
 	config    *Config
 	consumer  amqp.Consumer
 	producer  amqp.Producer
+	processor processors.Processor
 	counter   int
 	startTime time.Time
 	pool      *helpers.WorkersPull
@@ -36,14 +37,15 @@ type svc struct {
 
 func NewSvc(config *Config, consumer amqp.Consumer, producer amqp.Producer) Service {
 	return &svc{
-		config:   config,
-		consumer: consumer,
-		producer: producer,
-		finished: make(chan struct{}),
-		pool:     helpers.NewWorkersPull(config.Workers),
-		stop:     make(chan struct{}),
-		ch:       make(chan []byte),
-		Mutex:    &sync.Mutex{},
+		config:    config,
+		consumer:  consumer,
+		producer:  producer,
+		finished:  make(chan struct{}),
+		pool:      helpers.NewWorkersPull(config.Workers),
+		stop:      make(chan struct{}),
+		ch:        make(chan []byte),
+		Mutex:     &sync.Mutex{},
+		processor: processors.NewProcessor(),
 	}
 }
 
@@ -83,7 +85,7 @@ func (t *svc) process(ctx context.Context, msg amqp.Message) error {
 		return errors.Wrap(err, "proto.Unmarshal")
 	}
 
-	e := processors.Step3(&v)
+	e := t.processor.Step3(&v)
 
 	raw, err := proto.Marshal(e)
 	if err != nil {

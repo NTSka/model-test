@@ -10,7 +10,27 @@ import (
 	"time"
 )
 
-func Step1(msg []byte) (*event.EventStep1, error) {
+type Processor interface {
+	Step1(msg []byte) (*event.EventStep1, error)
+	Step2(e *event.EventStep1) *event.EventStep2
+	Step3(e *event.EventStep2) *event.EventStep3
+}
+
+type processor struct {
+	rand helpers.RandGenerator
+	cpu  *helpers.CPUBound
+}
+
+func NewProcessor() Processor {
+	rand := helpers.NewRandGenerator()
+	cp := helpers.NewCPUBound(rand)
+	return &processor{
+		rand: rand,
+		cpu:  cp,
+	}
+}
+
+func (p *processor) Step1(msg []byte) (*event.EventStep1, error) {
 	v := event.RawEvent{}
 	t := time.Now().UnixMilli()
 	if err := proto.Unmarshal(msg, &v); err != nil {
@@ -29,35 +49,35 @@ func Step1(msg []byte) (*event.EventStep1, error) {
 		}
 	}
 
-	helpers.CPUBoundTask()
+	p.cpu.CPUBoundTask()
 
 	return &event.EventStep1{
 		Event:     e,
 		Timestamp: t,
-		Meta1:     helpers.GenerateString(50),
+		Meta1:     p.rand.GetString(50),
 	}, nil
 }
 
-func Step2(v *event.EventStep1) *event.EventStep2 {
+func (p *processor) Step2(v *event.EventStep1) *event.EventStep2 {
 	e := event.EventStep2{
 		Event: v,
-		Meta2: helpers.GenerateString(30),
-		Meta3: helpers.GenerateString(50),
+		Meta2: p.rand.GetString(30),
+		Meta3: p.rand.GetString(50),
 	}
 
-	helpers.CPUBoundTask()
+	p.cpu.CPUBoundTask()
 
 	return &e
 }
 
-func Step3(v *event.EventStep2) *event.EventStep3 {
+func (p *processor) Step3(v *event.EventStep2) *event.EventStep3 {
 	e := event.EventStep3{
 		Event: v,
-		Meta4: helpers.GenerateString(30),
-		Meta5: helpers.GenerateString(50),
+		Meta4: p.rand.GetString(30),
+		Meta5: p.rand.GetString(50),
 	}
 
-	helpers.CPUBoundTask()
+	p.cpu.CPUBoundTask()
 
 	return &e
 }

@@ -5,7 +5,7 @@ clickhouse:
   dsn: "clickhouse://user:password@clickhouse:9000/db"
 
 svc:
-  total: 1000000
-  eps: 1000000
+  total: 500000
+  eps: 50000
   workers: 8
   report_dir: '/reports'

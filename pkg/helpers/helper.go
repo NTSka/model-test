@@ -13,9 +13,3 @@ func GenerateAsset() string {
 
 	return fmt.Sprintf("%d.%d.%d.%d", a, b, c, d)
 }
-
-func GenerateString(length int) string {
-	b := make([]byte, length+2)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)[2 : length+2]
-}

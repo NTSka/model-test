@@ -23,6 +23,7 @@ type svc struct {
 	total    int
 	stop     chan struct{}
 	ch       chan []byte
+	rand     helpers.RandGenerator
 }
 
 func NewSvc(config *Config, producer amqp.Producer) Svc {
@@ -31,6 +32,7 @@ func NewSvc(config *Config, producer amqp.Producer) Svc {
 		producer: producer,
 		stop:     make(chan struct{}),
 		ch:       make(chan []byte),
+		rand:     helpers.NewRandGenerator(),
 	}
 }
 
@@ -100,11 +102,11 @@ func (t *svc) makeEvent() *event.Event {
 	return &event.Event{
 		Assets: assets,
 		EventSrc: &event.EventSrc{
-			Host: helpers.GenerateString(20),
-			Type: helpers.GenerateString(10),
+			Host: t.rand.GetString(20),
+			Type: t.rand.GetString(10),
 		},
-		Action:     helpers.GenerateString(10),
+		Action:     t.rand.GetString(10),
 		Importance: event.Importance(rand.Intn(4)),
-		Object:     helpers.GenerateString(10),
+		Object:     t.rand.GetString(10),
 	}
 }

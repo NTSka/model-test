@@ -26,6 +26,7 @@ type svc struct {
 	consumer   amqp.Consumer
 	producer   amqp.Producer
 	clickhouse storage.Clickhouse
+	processor  processors.Processor
 	counter    int
 	sumTime    int64
 	startTime  time.Time
@@ -37,7 +38,11 @@ type svc struct {
 	*sync.Mutex
 }
 
-func NewSvc(config *Config, consumer amqp.Consumer, clickhouse storage.Clickhouse) Service {
+func NewSvc(
+	config *Config,
+	consumer amqp.Consumer,
+	clickhouse storage.Clickhouse,
+) Service {
 	return &svc{
 		config:     config,
 		consumer:   consumer,
@@ -47,6 +52,7 @@ func NewSvc(config *Config, consumer amqp.Consumer, clickhouse storage.Clickhous
 		Mutex:      &sync.Mutex{},
 		pool:       helpers.NewWorkersPull(config.Workers),
 		finished:   make(chan struct{}),
+		processor:  processors.NewProcessor(),
 	}
 }
 
@@ -88,14 +94,14 @@ func (t *svc) Run(ctx context.Context) error {
 }
 
 func (t *svc) process(ctx context.Context, msg amqp.Message) error {
-	v, err := processors.Step1(msg.Data())
+	v, err := t.processor.Step1(msg.Data())
 	if err != nil {
 		msg.Nack()
 		return errors.Wrap(err, "processors.Step1")
 	}
 
-	v2 := processors.Step2(v)
-	v3 := processors.Step3(v2)
+	v2 := t.processor.Step2(v)
+	v3 := t.processor.Step3(v2)
 
 	t.Mutex.Lock()
 	t.counter++
